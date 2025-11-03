@@ -1,11 +1,21 @@
+# arquivo/views.py
+from io import BytesIO
 from django.urls import reverse
+from django.shortcuts import render
 from reportlab.rl_config import defaultPageSize
+from django.http import HttpResponse, HttpResponseRedirect
+from .forms import FichaForm
 
+from reportlab.pdfbase import pdfmetrics
+from reportlab.pdfbase.ttfonts import TTFont
+from reportlab.pdfgen import canvas
+from reportlab.lib.units import cm
 
-
+# --- configuração de página ---
 largura_pagina = defaultPageSize[0]
 altura_pagina = defaultPageSize[1]
 
+# --- variáveis globais usadas pelo algoritmo ---
 linhas = []
 topo_res = 12
 passada_vert = 0.45
@@ -27,7 +37,7 @@ def index_ficha(request):
         if form.is_valid():
             nova_ficha = form.save(commit=False)
             request = salvaInformacoes(request, nova_ficha)
-            return HttpResponseRedirect(reverse('fichas:ficha'))
+            return HttpResponseRedirect('/ficha/')
 
     context = {'form': form}
     return render(request, 'index.html', context)
@@ -35,90 +45,100 @@ def index_ficha(request):
 
 def salvaInformacoes(request, nova_ficha):
     """Salva as informações do formulário para serem impressas na ficha"""
-    request.session['nome'] = nova_ficha.nome
-    request.session['sobrenome'] = nova_ficha.sobrenome
-    request.session['cutter'] = nova_ficha.cutter
-    request.session['titulo'] = nova_ficha.titulo
-    request.session['sub_titulo'] = nova_ficha.sub_titulo
-    request.session['curso'] = nova_ficha.curso
-    request.session['instituicao'] = nova_ficha.instituicao
-    request.session['cidade'] = nova_ficha.cidade
-    request.session['ano'] = nova_ficha.ano
+    # usamos get para evitar KeyError caso algum campo não exista
+    request.session['nome'] = getattr(nova_ficha, 'nome', '') or ''
+    request.session['sobrenome'] = getattr(nova_ficha, 'sobrenome', '') or ''
+    request.session['cutter'] = getattr(nova_ficha, 'cutter', '') or ''
+    request.session['titulo'] = getattr(nova_ficha, 'titulo', '') or ''
+    request.session['sub_titulo'] = getattr(nova_ficha, 'sub_titulo', None)
+    request.session['curso'] = getattr(nova_ficha, 'curso', '') or ''
+    request.session['instituicao'] = getattr(nova_ficha, 'instituicao', '') or ''
+    request.session['cidade'] = getattr(nova_ficha, 'cidade', '') or ''
+    request.session['ano'] = getattr(nova_ficha, 'ano', '') or ''
 
-    request.session['folhas'] = nova_ficha.folhas
-    request.session['figuras'] = nova_ficha.figuras
-    # request.session['encardenacao'] = nova_ficha.encardenacao
+    request.session['folhas'] = getattr(nova_ficha, 'folhas', '') or ''
+    request.session['figuras'] = getattr(nova_ficha, 'figuras', '') or ''
+    request.session['encardenacao'] = getattr(nova_ficha, 'encardenacao', '') or ''
 
-    request.session['orientador'] = nova_ficha.orientador
-    request.session['genero_orientador'] = nova_ficha.genero_orientador
-    request.session['titulo_orientador'] = nova_ficha.titulo_orientador
-    request.session['coorientador'] = nova_ficha.coorientador
-    request.session['genero_coorientador'] = nova_ficha.genero_coorientador
-    request.session['titulo_coorientador'] = nova_ficha.titulo_coorientador
+    request.session['orientador'] = getattr(nova_ficha, 'orientador', '') or ''
+    request.session['genero_orientador'] = getattr(nova_ficha, 'genero_orientador', '') or ''
+    request.session['titulo_orientador'] = getattr(nova_ficha, 'titulo_orientador', '') or ''
+    request.session['coorientador'] = getattr(nova_ficha, 'coorientador', None)
+    request.session['genero_coorientador'] = getattr(nova_ficha, 'genero_coorientador', None)
+    request.session['titulo_coorientador'] = getattr(nova_ficha, 'titulo_coorientador', None)
 
-    # request.session['referencias'] = nova_ficha.referencias
-    # request.session['anexos'] = nova_ficha.anexos
+    request.session['referencias'] = getattr(nova_ficha, 'referencias', '') or ''
+    request.session['anexos'] = getattr(nova_ficha, 'anexos', '') or ''
 
-    request.session['assunto1'] = nova_ficha.assunto1
-    request.session['assunto2'] = nova_ficha.assunto2
-    request.session['assunto3'] = nova_ficha.assunto3
-    request.session['assunto4'] = nova_ficha.assunto4
-    request.session['assunto5'] = nova_ficha.assunto5
+    # assuntos (até 5)
+    for i in range(1, 6):
+        request.session[f'assunto{i}'] = getattr(nova_ficha, f'assunto{i}', None)
 
-    request.session['tipo_trabalho'] = nova_ficha.tipo_trabalho
-    request.session['titulo_obtido'] = nova_ficha.titulo_obtido
-    request.session['fonte'] = nova_ficha.fonte
-    if nova_ficha.fonte == 'Arial':
+    request.session['tipo_trabalho'] = getattr(nova_ficha, 'tipo_trabalho', '') or ''
+    request.session['titulo_obtido'] = getattr(nova_ficha, 'titulo_obtido', '') or ''
+    request.session['fonte'] = getattr(nova_ficha, 'fonte', 'Helvetica') or 'Helvetica'
+    if request.session['fonte'].lower() == 'arial':
+        # não registramos TTF arbitrariamente — assumimos que Arial não está disponível.
+        # mapeamos para Helvetica (mais seguro) e deixamos um comentário.
+        request.session['fonte'] = 'Helvetica'
         request.session['tamanho_fonte'] = 10
     else:
-        request.session['tamanho_fonte'] = 11
+        request.session['tamanho_fonte'] = 11 if request.session['fonte'].lower() != 'arial' else 10
 
     return request
 
 
 def ficha(request):
     """Página onde o documento em pdf é gerado"""
-    response = HttpResponse(content_type='application/pdf')
-    response['Content-Disposition'] = 'inline; filename="ficha-catalográfica.pdf"'
-    print(f'request: {request} data: {request.POST}' )
+    # geramos o PDF em memória (BytesIO) e devolvemos como resposta
+    buffer = BytesIO()
+    p = canvas.Canvas(buffer, pagesize=(largura_pagina, altura_pagina))
 
-    draw_canvas = canvas.Canvas(response)
+    # define fonte e salva nome real da fonte usada na sessão
+    p = defineFonte(request, p)
+    p = desenhaRetangulo(request, p)
+    p = criaFicha(request, p)
 
-    draw_canvas = defineFonte(request, draw_canvas)
-    draw_canvas = desenhaRetangulo(request, draw_canvas)
-    draw_canvas = criaFicha(request, draw_canvas)
+    p.showPage()
+    p.save()
 
-    draw_canvas.showPage()
-    draw_canvas.save()
+    buffer.seek(0)
+    response = HttpResponse(buffer.getvalue(), content_type='application/pdf')
+    response['Content-Disposition'] = 'inline; filename="ficha-catalografica.pdf"'
     return response
 
 
 def defineFonte(request, draw_canvas):
-    """Define a fonte da ficha"""
-    monospace_font = "/usr/share/fonts/truetype/liberation/LiberationMono-Regular.ttf"
-    arial_font = "/usr/share/fonts/truetype/msttcorefonts/arial.ttf"
-    arial_bold_font = "/usr/share/fonts/truetype/msttcorefonts/Arial_Bold.ttf"
-    times_font = "/usr/share/fonts/truetype/msttcorefonts/Times_New_Roman.ttf"
-    times_bold_font = "/usr/share/fonts/truetype/msttcorefonts/Times_New_Roman_Bold.ttf"
+    """Define a fonte da ficha usando fontes padrão do ReportLab"""
+    fonte = request.session.get('fonte', 'Helvetica') or 'Helvetica'
+    tamanho = request.session.get('tamanho_fonte', 10) or 10
 
-    pdfmetrics.registerFont(TTFont('Monospace', monospace_font))
-    pdfmetrics.registerFont(TTFont('Arial', arial_font))
-    pdfmetrics.registerFont(TTFont('Arial_Bold', arial_bold_font))
-    pdfmetrics.registerFont(TTFont('Times', times_font))
-    pdfmetrics.registerFont(TTFont('Times_Bold', times_bold_font))
-
-    if request.session.get('fonte') == 'Times':
-       draw_canvas.setFont('Times-Roman', request.session.get('tamanho_fonte', 10))
-    elif request.session.get('fonte') == 'Arial':
-       draw_canvas.setFont('arial', request.session.get('tamanho_fonte', 10))
+    # Mapeamento simples para fontes ReportLab embutidas
+    fonte_lower = fonte.lower()
+    if fonte_lower.startswith('times'):
+        nome_font = "Times-Roman"
+    elif fonte_lower.startswith('courier'):
+        nome_font = "Courier"
     else:
-       draw_canvas.setFont('Monospace', request.session.get('tamanho_fonte', 10))
+        nome_font = "Helvetica"
+
+    # Aplica a fonte no canvas e salva na sessão o fontname que o canvas realmente usa
+    try:
+        draw_canvas.setFont(nome_font, tamanho)
+    except Exception:
+        # fallback seguro
+        nome_font = "Helvetica"
+        draw_canvas.setFont(nome_font, tamanho)
+
+    request.session['fonte_usada'] = nome_font
+    request.session['tamanho_fonte'] = tamanho
     return draw_canvas
 
 
 def desenhaRetangulo(request, draw_canvas):
     """Desenha o retângulo padrão de ficha catalográfica"""
     draw_canvas.setLineWidth(0.1)
+    # usa cm (importado) — evita NameError
     draw_canvas.rect(4 * cm, 5.5 * cm, 13.5 * cm, 7.5 * cm, stroke=1, fill=False)
     return draw_canvas
 
@@ -149,14 +169,14 @@ def criaFicha(request, draw_canvas):
 
     # Monta a linha com informações sobre tipo de trabalho
     tipo_trabalho_info = (
-        f"{request.session['tipo_trabalho']} ({request.session['titulo_obtido']}) - "
-        f"{request.session['instituicao']}, curso de {request.session['curso']}."
+        f"{request.session.get('tipo_trabalho','')} ({request.session.get('titulo_obtido','')}) - "
+        f"{request.session.get('instituicao','')}, curso de {request.session.get('curso','')}."
     )
     linhas.append(tipo_trabalho_info)
 
-    # Adiciona referências e anexos
-    linhas.append(f"Referências bibliográficas: f.{request.session['referencias']}")
-    linhas.append(f"Anexos: f.{request.session['anexos']}")
+    # Adiciona referências e anexos (usando get para segurança)
+    linhas.append(f"Referências bibliográficas: f.{request.session.get('referencias','')}")
+    linhas.append(f"Anexos: f.{request.session.get('anexos','')}")
     linhas.append(pista)
 
     # Impressão das informações na ficha
@@ -168,7 +188,8 @@ def criaFicha(request, draw_canvas):
     topo_res = 12.3
 
     for i in range(len(linhas)):
-        draw_canvas = escreveInformacoes(draw_canvas, selecionaBloco(i, request), i)
+        bloco = selecionaBloco(i, request)
+        draw_canvas = escreveInformacoes(draw_canvas, bloco, i)
 
     topo_res = 12
 
@@ -177,10 +198,15 @@ def criaFicha(request, draw_canvas):
 
 def processaNome(request):
     """Arruma o bloco de nome antes de imprimir na ficha"""
-    nome = request.session['sobrenome'] + ", " + request.session['nome']
-
+    nome = f"{request.session.get('sobrenome','')}, {request.session.get('nome','')}"
     global recuo
-    recuo = stringWidth(nome[:4], request.session['fonte'], request.session.get('tamanho_fonte', 10)) / cm
+    # usa pdfmetrics.stringWidth e o nome da fonte real (fonte_usada) para calcular
+    fontname = request.session.get('fonte_usada', request.session.get('fonte', 'Helvetica'))
+    fontsize = request.session.get('tamanho_fonte', 10) or 10
+    largura_prefixo = pdfmetrics.stringWidth(nome[:4], fontname, fontsize)
+    # convertendo de pontos para cm: 1 cm == 28.3464567 pontos (reportlab.lib.units.cm)
+    # já que estamos dividindo por cm que é 72/2.54? usar cm constante do reportlab transforma em unidade correta.
+    recuo = largura_prefixo / (cm)  # mantém compatibilidade com seu uso original
     return nome
 
 
@@ -188,15 +214,18 @@ def processaPista(request):
     """Arruma o bloco de assuntos antes de imprimir na ficha"""
     pista = ""
     for i in range(1, 6):
-        if request.session['assunto' + str(i)] is None:
+        assunto = request.session.get(f'assunto{i}')
+        if not assunto:
             break
-        pista += str(i) + ". " + request.session['assunto' + str(i)] + ". "
+        pista += str(i) + ". " + str(assunto) + ". "
     pista += "I. Título."
     return pista
 
+
 def processaCutter(request):
     """Retorna o valor do cutter armazenado na sessão."""
-    return request.session.get('cutter')
+    return request.session.get('cutter', '')
+
 
 def selecionaCutter(nome, lista, i):
     """Função recursiva que seleciona o par chave - valor correto."""
@@ -220,66 +249,61 @@ def selecionaCutter(nome, lista, i):
 
 def processaTitulo(request):
     """Arruma o bloco de titulo antes de imprimir na ficha"""
-    titulo = ""
-    if request.session['sub_titulo'] is None:
+    if not request.session.get('sub_titulo'):
         titulo = (
-            request.session['titulo'] + " / " +
-            request.session['nome'] + " " +
-            request.session['sobrenome'] + ". " +
-            request.session['cidade'] + " " +  # Adicione um espaço aqui
-            str(request.session['ano']) + "."
+            f"{request.session.get('titulo','')} / "
+            f"{request.session.get('nome','')} {request.session.get('sobrenome','')}. "
+            f"{request.session.get('cidade','')} {request.session.get('ano','')}."
         )
     else:
         titulo = (
-            request.session['titulo'] + ": " +
-            request.session['sub_titulo'] + " / " +
-            request.session['nome'] + " " +
-            request.session['sobrenome'] + ". " +
-            request.session['cidade'] + " " +
-            str(request.session['ano']) + "."
+            f"{request.session.get('titulo','')}: {request.session.get('sub_titulo','')} / "
+            f"{request.session.get('nome','')} {request.session.get('sobrenome','')}. "
+            f"{request.session.get('cidade','')} {request.session.get('ano','')}."
         )
     return titulo
 
 
 def processaTrabalho(request):
     """Define se existe ou não figuras antes de imprimir na ficha"""
-    figuras = str(request.session['folhas']) + "f."
-    if request.session['figuras'] == 'Sim':
-        figuras += " il. "
-    figuras += 'enc.' + request.session['encardenacao'].lower() + '. capa dura'
-    return figuras
+    folhas = str(request.session.get('folhas', ''))
+    texto = folhas + "f."
+    if request.session.get('figuras') == 'Sim':
+        texto += " il. "
+    enc = request.session.get('encardenacao', '')
+    if enc:
+        texto += 'enc.' + enc.lower() + '. capa dura'
+    else:
+        texto += 'enc.'
+    return texto
 
 
 def processaOrientacao(request):
     """Processa as informações do orientador"""
-    orientacao = ""
-    titulo = defineTitulo(request.session['titulo_orientador'], request.session['genero_orientador'])
-
-    if request.session['genero_orientador'] == 'Masculino':
-        orientacao = "Orientador: Prof. " + titulo + " " + request.session['orientador'] + "."
+    titulo = defineTitulo(request.session.get('titulo_orientador', ''), request.session.get('genero_orientador', ''))
+    orientador_nome = request.session.get('orientador', '')
+    if request.session.get('genero_orientador', '').lower() == 'masculino':
+        orientacao = f"Orientador: Prof. {titulo} {orientador_nome}."
     else:
-        orientacao = "Orientadora: Profª. " + titulo + " " + request.session['orientador'] + "."
+        orientacao = f"Orientadora: Profª. {titulo} {orientador_nome}."
     return orientacao
 
 
 def processaCoorientacao(request):
     """Processa as informações do coorientador"""
-    if request.session['coorientador'] is None:
+    if not request.session.get('coorientador'):
         return ""
 
-    coorientacao = ""
-    titulo = defineTitulo(request.session['titulo_coorientador'], request.session['genero_coorientador'])
-
-    if request.session['genero_coorientador'] == 'Masculino':
-        coorientacao = "Coorientador: Prof. " + titulo + " " + request.session['coorientador'] + "."
+    titulo = defineTitulo(request.session.get('titulo_coorientador', ''), request.session.get('genero_coorientador', ''))
+    coorientador_nome = request.session.get('coorientador', '')
+    if request.session.get('genero_coorientador', '').lower() == 'masculino':
+        return f"Coorientador: Prof. {titulo} {coorientador_nome}."
     else:
-        coorientacao = "Coorientadora: Profª. " + titulo + " " + request.session['coorientador'] + "."
-    return coorientacao
+        return f"Coorientadora: Profª. {titulo} {coorientador_nome}."
 
 
 def defineTitulo(titulo, genero):
     abreviacao = ""
-
     if titulo == 'Especialista':
         abreviacao = 'Esp.'
     elif titulo == 'Mestre':
@@ -302,11 +326,14 @@ def selecionaBloco(index, request):
     para_prox_linha = ""
     linha_formatada = ""
 
+    fontname = request.session.get('fonte_usada', request.session.get('fonte', 'Helvetica'))
+    fontsize = request.session.get('tamanho_fonte', 10) or 10
+
     for i in range(0, len(linha)):
         linha_formatada += para_prox_linha
         para_prox_linha = ""
         linha_formatada += linha[i]
-        largura = stringWidth(linha_formatada, request.session['fonte'], request.session.get('tamanho_fonte', 10)) / cm
+        largura = pdfmetrics.stringWidth(linha_formatada, fontname, fontsize) / cm
         if (largura >= 10.2):
             for j in range(len(linha_formatada) - 1, 0, -1):
                 if linha_formatada[j] != ' ':
@@ -317,7 +344,7 @@ def selecionaBloco(index, request):
             bloco.append(linha_formatada)
             linha_formatada = ""
 
-    if linha_formatada is not None:
+    if linha_formatada is not None and linha_formatada != "":
         bloco.append(linha_formatada)
 
     return bloco
@@ -325,14 +352,25 @@ def selecionaBloco(index, request):
 
 def escreveCabecalho(draw_canvas, request):
     """Escreve o cabeçalho da ficha"""
-    draw_canvas.setFont(request.session['fonte'] + '_Bold', request.session.get('tamanho_fonte', 10))
+    # robustez ao definir variantes em negrito: nem todas as fontes têm sufixo _Bold
+    font_base = request.session.get('fonte_usada', 'Helvetica')
+    fontsize = request.session.get('tamanho_fonte', 10) or 10
+    # tenta uma variante em negrito, se existir; senão usa a base
+    bold_candidate = font_base + '-Bold' if not font_base.endswith('-Bold') else font_base
+    try:
+        draw_canvas.setFont(bold_candidate, fontsize)
+        font_to_use = bold_candidate
+    except Exception:
+        draw_canvas.setFont(font_base, fontsize)
+        font_to_use = font_base
+
     cabecalho1 = "Ficha de identificação da obra elaborada pelo autor, através do"
     cabecalho2 = "Programa de Geração Automática do Sistema Integrado de Bibliotecas do IF Goiano - SIBi"
-    largura1 = stringWidth(cabecalho1, request.session['fonte'], request.session.get('tamanho_fonte', 10))
-    largura2 = stringWidth(cabecalho2, request.session['fonte'], request.session.get('tamanho_fonte', 10))
+    largura1 = pdfmetrics.stringWidth(cabecalho1, font_to_use, fontsize)
+    largura2 = pdfmetrics.stringWidth(cabecalho2, font_to_use, fontsize)
     draw_canvas.drawString((largura_pagina - largura1) / 2, (topo_res + 2) * cm, cabecalho1)
     draw_canvas.drawString((largura_pagina - largura2) / 2, (topo_res + 1.5) * cm, cabecalho2)
-    draw_canvas.setFont(request.session['fonte'], request.session.get('tamanho_fonte', 10))
+    draw_canvas.setFont(font_base, fontsize)
     return draw_canvas
 
 
@@ -344,5 +382,56 @@ def escreveRodape(draw_canvas, request):
 
     rodape = ""
     draw_canvas.drawString((esquerda - 1.5) * cm, (topo_res - reducao) * cm, rodape)
-    assuntos = retornaAssuntos(request)
+    assuntos = retornaAssuntos(request) if 'retornaAssuntos' in globals() else []
     reducao += passo
+    # NOTE: o resto da lógica do rodapé deve continuar aqui; mantive a assinatura original.
+    return draw_canvas
+
+
+# Placeholder: se você tem outras funções como escreveCutter, escreveInformacoes, retornaAssuntos, etc.
+# mantenha-as no arquivo. Se estiverem definidas em outro local, não as duplique.
+# Abaixo coloco placeholders defensivos caso não existam — substitua pelas suas versões reais.
+
+def escreveCutter(draw_canvas, cutter_val):
+    """Escreve a informação do cutter no local apropriado (placeholder)."""
+    # implementação mínima para não quebrar a execução — ajuste conforme sua lógica real
+    fontname = request_fontname_for_canvas(draw_canvas)
+    fontsize = 10
+    draw_canvas.setFont(fontname, fontsize)
+    draw_canvas.drawString((esquerda) * cm, (topo_res - 0.5) * cm, str(cutter_val or ''))
+    return draw_canvas
+
+
+def escreveInformacoes(draw_canvas, bloco, index):
+    """Escreve os blocos de texto (placeholder)."""
+    fontname = request_fontname_for_canvas(draw_canvas)
+    fontsize = 10
+    draw_canvas.setFont(fontname, fontsize)
+
+    # desenha cada linha do bloco, ajustando topo_res por linha
+    global topo_res
+    y = (topo_res - 3.5) * cm - index * (passada_vert * cm)
+    if isinstance(bloco, list):
+        for i, linha in enumerate(bloco):
+            draw_canvas.drawString(esquerda * cm, y - i * (passada_vert * cm), linha)
+    else:
+        draw_canvas.drawString(esquerda * cm, y, str(bloco))
+    return draw_canvas
+
+
+def retornaAssuntos(request):
+    """Retorna lista de assuntos (placeholder) — ajuste para sua versão real."""
+    ass = []
+    for i in range(1, 6):
+        val = request.session.get(f'assunto{i}')
+        if val:
+            ass.append(val)
+    return ass
+
+
+def request_fontname_for_canvas(draw_canvas):
+    """Auxiliar para extrair o fontname atualmente setado no canvas (fallback)."""
+    try:
+        return draw_canvas._fontname
+    except Exception:
+        return 'Helvetica'

@@ -1,2 +1,64 @@
-venv/
+# -----------------------------
+# Python / Django
+# -----------------------------
+*.pyc
+*.pyo
+*.pyd
+__pycache__/
+*.sqlite3
 db.sqlite3
+*.log
+*.pot
+*.py[cod]
+*.so
+
+# Django stuff:
+*.mo
+*.pyc
+*.pyo
+*.pyd
+__pycache__/
+local_settings.py
+media
+/staticfiles/
+*.db
+*.sqlite3
+
+# -----------------------------
+# Virtual environment
+# -----------------------------
+venv/
+env/
+ENV/
+*.env
+
+# -----------------------------
+# IDEs
+# -----------------------------
+# JetBrains IDEs
+.idea/
+*.iml
+
+# VS Code
+.vscode/
+
+# -----------------------------
+# OS files
+# -----------------------------
+.DS_Store
+Thumbs.db
+
+# -----------------------------
+# Pytest / coverage
+# -----------------------------
+.coverage
+htmlcov/
+.tox/
+.pytest_cache/
+
+# -----------------------------
+# Migrations
+# -----------------------------
+*.py[cod]
+*/migrations/*.pyc
+*/migrations/*.py[cod]

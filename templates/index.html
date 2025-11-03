@@ -1,0 +1,17 @@
+<!-- project_root/templates/index.html -->
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8">
+    <title>Ficha - Início</title>
+  </head>
+  <body>
+    <h1>Gerador de Ficha Catalográfica</h1>
+    <form method="post" action="">
+      {% csrf_token %}
+      {{ form.as_p }}
+      <button type="submit">Gerar ficha</button>
+    </form>
+  </body>
+</html>
+-
