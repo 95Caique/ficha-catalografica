@@ -1,4 +1,3 @@
-# arquivo/views.py
 from io import BytesIO
 from django.urls import reverse
 from django.shortcuts import render
@@ -11,11 +10,9 @@ from reportlab.pdfbase.ttfonts import TTFont
 from reportlab.pdfgen import canvas
 from reportlab.lib.units import cm
 
-# --- configuração de página ---
 largura_pagina = defaultPageSize[0]
 altura_pagina = defaultPageSize[1]
 
-# --- variáveis globais usadas pelo algoritmo ---
 linhas = []
 topo_res = 12
 passada_vert = 0.45
@@ -29,10 +26,8 @@ assuntos = []
 def index_ficha(request):
     """A página inicial do app Fichas Catalográficas"""
     if request.method != 'POST':
-        # Requisição GET: abre formulário em branco
         form = FichaForm()
     else:
-        # Requisição POST: Dados do formulário são processados
         form = FichaForm(request.POST)
         if form.is_valid():
             nova_ficha = form.save(commit=False)
@@ -45,7 +40,6 @@ def index_ficha(request):
 
 def salvaInformacoes(request, nova_ficha):
     """Salva as informações do formulário para serem impressas na ficha"""
-    # usamos get para evitar KeyError caso algum campo não exista
     request.session['nome'] = getattr(nova_ficha, 'nome', '') or ''
     request.session['sobrenome'] = getattr(nova_ficha, 'sobrenome', '') or ''
     request.session['cutter'] = getattr(nova_ficha, 'cutter', '') or ''
@@ -78,8 +72,6 @@ def salvaInformacoes(request, nova_ficha):
     request.session['titulo_obtido'] = getattr(nova_ficha, 'titulo_obtido', '') or ''
     request.session['fonte'] = getattr(nova_ficha, 'fonte', 'Helvetica') or 'Helvetica'
     if request.session['fonte'].lower() == 'arial':
-        # não registramos TTF arbitrariamente — assumimos que Arial não está disponível.
-        # mapeamos para Helvetica (mais seguro) e deixamos um comentário.
         request.session['fonte'] = 'Helvetica'
         request.session['tamanho_fonte'] = 10
     else:
@@ -90,7 +82,6 @@ def salvaInformacoes(request, nova_ficha):
 
 def ficha(request):
     """Página onde o documento em pdf é gerado"""
-    # geramos o PDF em memória (BytesIO) e devolvemos como resposta
     buffer = BytesIO()
     p = canvas.Canvas(buffer, pagesize=(largura_pagina, altura_pagina))
 
@@ -113,7 +104,6 @@ def defineFonte(request, draw_canvas):
     fonte = request.session.get('fonte', 'Helvetica') or 'Helvetica'
     tamanho = request.session.get('tamanho_fonte', 10) or 10
 
-    # Mapeamento simples para fontes ReportLab embutidas
     fonte_lower = fonte.lower()
     if fonte_lower.startswith('times'):
         nome_font = "Times-Roman"
@@ -122,7 +112,6 @@ def defineFonte(request, draw_canvas):
     else:
         nome_font = "Helvetica"
 
-    # Aplica a fonte no canvas e salva na sessão o fontname que o canvas realmente usa
     try:
         draw_canvas.setFont(nome_font, tamanho)
     except Exception:
@@ -148,7 +137,6 @@ def criaFicha(request, draw_canvas):
     # Limpa a lista de linhas
     linhas.clear()
 
-    # Pré-processamento das informações
     nome = processaNome(request)
     pista = processaPista(request)
     cutter = processaCutter(request)
@@ -157,29 +145,24 @@ def criaFicha(request, draw_canvas):
     orientacao = processaOrientacao(request)
     coorientacao = processaCoorientacao(request)
 
-    # Processamento das informações
     linhas.append(nome)
     linhas.append(titulo)
     linhas.append(trabalho)
     linhas.append(orientacao)
 
-    # Adiciona coorientação se não estiver vazia
     if coorientacao:
         linhas.append(coorientacao)
 
-    # Monta a linha com informações sobre tipo de trabalho
     tipo_trabalho_info = (
         f"{request.session.get('tipo_trabalho','')} ({request.session.get('titulo_obtido','')}) - "
         f"{request.session.get('instituicao','')}, curso de {request.session.get('curso','')}."
     )
     linhas.append(tipo_trabalho_info)
 
-    # Adiciona referências e anexos (usando get para segurança)
     linhas.append(f"Referências bibliográficas: f.{request.session.get('referencias','')}")
     linhas.append(f"Anexos: f.{request.session.get('anexos','')}")
     linhas.append(pista)
 
-    # Impressão das informações na ficha
     draw_canvas = escreveCabecalho(draw_canvas, request)
     draw_canvas = escreveRodape(draw_canvas, request)
     draw_canvas = escreveCutter(draw_canvas, cutter)
@@ -204,9 +187,7 @@ def processaNome(request):
     fontname = request.session.get('fonte_usada', request.session.get('fonte', 'Helvetica'))
     fontsize = request.session.get('tamanho_fonte', 10) or 10
     largura_prefixo = pdfmetrics.stringWidth(nome[:4], fontname, fontsize)
-    # convertendo de pontos para cm: 1 cm == 28.3464567 pontos (reportlab.lib.units.cm)
-    # já que estamos dividindo por cm que é 72/2.54? usar cm constante do reportlab transforma em unidade correta.
-    recuo = largura_prefixo / (cm)  # mantém compatibilidade com seu uso original
+    recuo = largura_prefixo / (cm)
     return nome
 
 
@@ -352,10 +333,8 @@ def selecionaBloco(index, request):
 
 def escreveCabecalho(draw_canvas, request):
     """Escreve o cabeçalho da ficha"""
-    # robustez ao definir variantes em negrito: nem todas as fontes têm sufixo _Bold
     font_base = request.session.get('fonte_usada', 'Helvetica')
     fontsize = request.session.get('tamanho_fonte', 10) or 10
-    # tenta uma variante em negrito, se existir; senão usa a base
     bold_candidate = font_base + '-Bold' if not font_base.endswith('-Bold') else font_base
     try:
         draw_canvas.setFont(bold_candidate, fontsize)
@@ -384,17 +363,11 @@ def escreveRodape(draw_canvas, request):
     draw_canvas.drawString((esquerda - 1.5) * cm, (topo_res - reducao) * cm, rodape)
     assuntos = retornaAssuntos(request) if 'retornaAssuntos' in globals() else []
     reducao += passo
-    # NOTE: o resto da lógica do rodapé deve continuar aqui; mantive a assinatura original.
     return draw_canvas
 
 
-# Placeholder: se você tem outras funções como escreveCutter, escreveInformacoes, retornaAssuntos, etc.
-# mantenha-as no arquivo. Se estiverem definidas em outro local, não as duplique.
-# Abaixo coloco placeholders defensivos caso não existam — substitua pelas suas versões reais.
-
 def escreveCutter(draw_canvas, cutter_val):
     """Escreve a informação do cutter no local apropriado (placeholder)."""
-    # implementação mínima para não quebrar a execução — ajuste conforme sua lógica real
     fontname = request_fontname_for_canvas(draw_canvas)
     fontsize = 10
     draw_canvas.setFont(fontname, fontsize)
@@ -408,7 +381,6 @@ def escreveInformacoes(draw_canvas, bloco, index):
     fontsize = 10
     draw_canvas.setFont(fontname, fontsize)
 
-    # desenha cada linha do bloco, ajustando topo_res por linha
     global topo_res
     y = (topo_res - 3.5) * cm - index * (passada_vert * cm)
     if isinstance(bloco, list):
