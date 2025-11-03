@@ -1,5 +1,5 @@
 from django import forms
-from .models import Ficha  # supondo que você tenha um modelo chamado Ficha
+from .models import Ficha
 
 class FichaForm(forms.ModelForm):
     class Meta:
