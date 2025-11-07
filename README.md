@@ -51,7 +51,10 @@ docker-compose exec app python manage.py createsuperuser
 # Parar e remover containers e volumes:
 docker-compose down -v
 
-Se a porta 8000 estiver ocupada, edite o docker-compose.yml:
+Se a porta 8000 estiver ocupada, edite:
+
+docker-compose.yml:
+
 ports:
   - "8080:8000"
 docker-compose up --build
