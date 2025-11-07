@@ -1,6 +1,7 @@
 from django.db import models
 from django.core.validators import MaxValueValidator, MinValueValidator
 
+
 class Ficha(models.Model):
 
     FONTE = (
@@ -77,6 +78,8 @@ class Ficha(models.Model):
     assunto5 = models.CharField(max_length=100, default='', blank=True, null=True)
     fonte = models.CharField(max_length=15, choices=FONTE, default='Times')
     tamanho_fonte = models.PositiveIntegerField(validators=[MaxValueValidator(14), MinValueValidator(9)], default=11)
+    # created_at = models.DateTimeField(auto_now_add=True)
+
 
 
     def __str__(self):

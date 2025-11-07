@@ -11,5 +11,4 @@ class FichaAdmin(admin.ModelAdmin):
     ordering = ('-ano', 'nome')
     list_per_page = 25
 
-    # Especificando qual campo será usado como link na tabela do admin
     list_display_links = ('titulo',)

@@ -20,7 +20,7 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
 
 
-    'arquivo',  #
+    'arquivo',
 ]
 
 MIDDLEWARE = [
@@ -38,9 +38,8 @@ ROOT_URLCONF = 'ficha.urls'
 TEMPLATES = [
     {
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
-        # Adiciona pasta global "templates" no nível do projeto
         'DIRS': [BASE_DIR / 'templates'],
-        'APP_DIRS': True,  # procura também em cada app (ex: arquivo/templates/)
+        'APP_DIRS': True,
         'OPTIONS': {
             'context_processors': [
                 'django.template.context_processors.debug',
