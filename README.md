@@ -57,6 +57,7 @@ docker-compose.yml:
 
 ports:
   - "8080:8000"
+    
 docker-compose up --build
 
 Isso cria a imagem, instala dependências e sobe o servidor.
