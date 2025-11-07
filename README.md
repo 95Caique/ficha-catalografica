@@ -7,7 +7,7 @@ utilizando Django e Docker.
 
 🚀 Rodando o projeto via Docker (recomendado)
 
-# 1️⃣ Pré-requisitos:
+# Pré-requisitos:
 
 Ter Docker e Docker Compose instalados.Verifique se o Docker está instalado.
 se já tiver, pule para a seção "Rodando o projeto via Docker".
@@ -42,13 +42,13 @@ ou se quiser rodar em segundo plano e manter o terminal livre:
 docker-compose up -d --build
 
 
-# Aplicar migrações
+# Aplicar migrações:
 docker-compose exec app python manage.py migrate
 
-# Criar superusuário (para acessar /admin)
+# Criar superusuário (para acessar /admin):
 docker-compose exec app python manage.py createsuperuser
 
-# Parar e remover containers e volumes
+# Parar e remover containers e volumes:
 docker-compose down -v
 
 Se a porta 8000 estiver ocupada, edite o docker-compose.yml:
@@ -62,27 +62,36 @@ Quando terminar, acesse http://localhost:8000
 
 # Rodando o projeto localmente (sem Docker rodando na venv):
 
+
 🧩 Pré-requisitos:
 
 Ter Python 3.9+ instalado.
 
-# 1️⃣ Verifique o Python
+# 1️⃣ Verifique o Python:
 python3 --version
 
-# 2️⃣ Crie o ambiente virtual
+# 2️⃣ Crie o ambiente virtual:
 python3 -m venv venv
 
-# 3️⃣ Ative o venv
+# 3️⃣ Ative o venv:
 source venv/bin/activate
 
-# 4️⃣ Atualize o pip e instale as dependências
+# 4️⃣ Atualize o pip e instale as dependências:
 pip install --upgrade pip
 pip install -r requirements.txt
 
-# 5️⃣ Rode migrações e inicie o servidor
+# 5️⃣ Rode migrações e inicie o servidor:
 python manage.py migrate --noinput
 python manage.py runserver 0.0.0.0:8000
 
 Acesse em http://localhost:8000
 
 Para sair do ambiente virtual digite no terminal: deactivate
+
+# Imagens de como é o projeto:
+
+![img.png](img.png)
+
+![img_1.png](img_1.png)
+
+![img_2.png](img_2.png)
