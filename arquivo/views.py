@@ -1,10 +1,15 @@
 from io import BytesIO
-from django.urls import reverse
-from django.shortcuts import render
-from reportlab.rl_config import defaultPageSize
-from django.http import HttpResponse, HttpResponseRedirect
+
+
 from .forms import FichaForm
 
+
+from django.urls import reverse
+from django.shortcuts import render
+from django.http import HttpResponse, HttpResponseRedirect
+
+
+from reportlab.rl_config import defaultPageSize
 from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfbase.ttfonts import TTFont
 from reportlab.pdfgen import canvas
@@ -14,7 +19,7 @@ largura_pagina = defaultPageSize[0]
 altura_pagina = defaultPageSize[1]
 
 linhas = []
-topo_res = 12
+topo_res = 13
 passada_vert = 0.45
 
 esquerda = 6
@@ -24,7 +29,6 @@ assuntos = []
 
 
 def index_ficha(request):
-    """A página inicial do app Fichas Catalográficas"""
     if request.method != 'POST':
         form = FichaForm()
     else:
@@ -64,7 +68,6 @@ def salvaInformacoes(request, nova_ficha):
     request.session['referencias'] = getattr(nova_ficha, 'referencias', '') or ''
     request.session['anexos'] = getattr(nova_ficha, 'anexos', '') or ''
 
-    # assuntos (até 5)
     for i in range(1, 6):
         request.session[f'assunto{i}'] = getattr(nova_ficha, f'assunto{i}', None)
 
@@ -100,7 +103,6 @@ def ficha(request):
 
 
 def defineFonte(request, draw_canvas):
-    """Define a fonte da ficha usando fontes padrão do ReportLab"""
     fonte = request.session.get('fonte', 'Helvetica') or 'Helvetica'
     tamanho = request.session.get('tamanho_fonte', 10) or 10
 
@@ -125,9 +127,8 @@ def defineFonte(request, draw_canvas):
 
 
 def desenhaRetangulo(request, draw_canvas):
-    """Desenha o retângulo padrão de ficha catalográfica"""
+    """Desenha o aquele retângulo padrão de ficha catalográfica"""
     draw_canvas.setLineWidth(0.1)
-    # usa cm (importado) — evita NameError
     draw_canvas.rect(4 * cm, 5.5 * cm, 13.5 * cm, 7.5 * cm, stroke=1, fill=False)
     return draw_canvas
 
@@ -180,10 +181,9 @@ def criaFicha(request, draw_canvas):
 
 
 def processaNome(request):
-    """Arruma o bloco de nome antes de imprimir na ficha"""
     nome = f"{request.session.get('sobrenome','')}, {request.session.get('nome','')}"
     global recuo
-    # usa pdfmetrics.stringWidth e o nome da fonte real (fonte_usada) para calcular
+    # usa pdfmetrics.stringWidth e o nome da fonte real (fonte_usada) para calcular pra não dar conflito na hora de escrever os dados na ficha
     fontname = request.session.get('fonte_usada', request.session.get('fonte', 'Helvetica'))
     fontsize = request.session.get('tamanho_fonte', 10) or 10
     largura_prefixo = pdfmetrics.stringWidth(nome[:4], fontname, fontsize)
@@ -204,12 +204,10 @@ def processaPista(request):
 
 
 def processaCutter(request):
-    """Retorna o valor do cutter armazenado na sessão."""
     return request.session.get('cutter', '')
 
 
 def selecionaCutter(nome, lista, i):
-    """Função recursiva que seleciona o par chave - valor correto."""
     nova_lista = []
 
     for tupla in lista:
@@ -344,7 +342,7 @@ def escreveCabecalho(draw_canvas, request):
         font_to_use = font_base
 
     cabecalho1 = "Ficha de identificação da obra elaborada pelo autor, através do"
-    cabecalho2 = "Programa de Geração Automática do Sistema Integrado de Bibliotecas do IF Goiano - SIBi"
+    cabecalho2 = "Programa de Geração Automática do Sistema de Ficha Catalográfica"
     largura1 = pdfmetrics.stringWidth(cabecalho1, font_to_use, fontsize)
     largura2 = pdfmetrics.stringWidth(cabecalho2, font_to_use, fontsize)
     draw_canvas.drawString((largura_pagina - largura1) / 2, (topo_res + 2) * cm, cabecalho1)
@@ -354,7 +352,7 @@ def escreveCabecalho(draw_canvas, request):
 
 
 def escreveRodape(draw_canvas, request):
-    """Escreve o rodapé da ficha"""
+    """Escreve o rodapé da ficha caso tenha assuntos"""
     global assuntos
     reducao = 7.2
     passo = 0.5
@@ -367,7 +365,6 @@ def escreveRodape(draw_canvas, request):
 
 
 def escreveCutter(draw_canvas, cutter_val):
-    """Escreve a informação do cutter no local apropriado (placeholder)."""
     fontname = request_fontname_for_canvas(draw_canvas)
     fontsize = 10
     draw_canvas.setFont(fontname, fontsize)
@@ -376,10 +373,10 @@ def escreveCutter(draw_canvas, cutter_val):
 
 
 def escreveInformacoes(draw_canvas, bloco, index):
-    """Escreve os blocos de texto (placeholder)."""
     fontname = request_fontname_for_canvas(draw_canvas)
     fontsize = 10
     draw_canvas.setFont(fontname, fontsize)
+
 
     global topo_res
     y = (topo_res - 3.5) * cm - index * (passada_vert * cm)
@@ -392,7 +389,6 @@ def escreveInformacoes(draw_canvas, bloco, index):
 
 
 def retornaAssuntos(request):
-    """Retorna lista de assuntos (placeholder) — ajuste para sua versão real."""
     ass = []
     for i in range(1, 6):
         val = request.session.get(f'assunto{i}')
@@ -402,7 +398,6 @@ def retornaAssuntos(request):
 
 
 def request_fontname_for_canvas(draw_canvas):
-    """Auxiliar para extrair o fontname atualmente setado no canvas (fallback)."""
     try:
         return draw_canvas._fontname
     except Exception:

@@ -1,17 +1,291 @@
-<!-- project_root/templates/index.html -->
-<!doctype html>
+{% load static %}
+
+<!DOCTYPE html>
 <html lang="pt-BR">
-  <head>
-    <meta charset="utf-8">
-    <title>Ficha - Início</title>
-  </head>
-  <body>
-    <h1>Gerador de Ficha Catalográfica</h1>
-    <form method="post" action="">
-      {% csrf_token %}
-      {{ form.as_p }}
-      <button type="submit">Gerar ficha</button>
-    </form>
-  </body>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Gere sua ficha catalográfica de forma rápida, fácil e gratuita. Ferramenta profissional seguindo padrões bibliográficos para a comunidade acadêmica.">
+    <meta name="keywords" content="ficha catalográfica, biblioteca, catalogação, AACR2, CDD, ISBN, ferramenta acadêmica">
+    <title>Gerador de Ficha Catalográfica - Ferramenta Acadêmica Online</title>
+    <link rel="stylesheet" href="{% static 'css/style.css' %}">
+
+</head>
+<body>
+    <header>
+        <div class="header-content">
+            <div class="logo">📚</div>
+            <div class="header-text">
+                <h1>Gerador de Ficha Catalográfica</h1>
+                <p>Crie sua ficha de forma rápida e profissional</p>
+            </div>
+        </div>
+    </header>
+
+    <main class="container">
+        <section class="hero">
+            <div class="badge">✨ <span style="margin-left:.5rem">Ferramenta Acadêmica</span></div>
+            <h2>Gere sua Ficha Catalográfica em <span class="gradient-text">minutos</span></h2>
+            <p class="hero-description">Preencha o formulário abaixo com os dados da sua obra e gere automaticamente uma ficha catalográfica profissional seguindo os padrões bibliográficos.</p>
+        </section>
+
+        <div class="form-card">
+            <div class="form-header">
+                <div class="form-icon">✓</div>
+                <div>
+                    <h3>Dados da Obra</h3>
+                    <p>Todos os campos marcados com * são obrigatórios</p>
+                </div>
+            </div>
+
+            {# Form Django - precisa do 'form' no contexto (index_ficha view) #}
+            <form method="post" action="">
+                {% csrf_token %}
+
+                {% if form.non_field_errors %}
+                    <div class="field-error">{{ form.non_field_errors }}</div>
+                {% endif %}
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="{{ form.sobrenome.id_for_label }}">Sobrenome <span class="required">*</span></label>
+                        {{ form.sobrenome }}
+                        {% if form.sobrenome.errors %}<div class="field-error">{{ form.sobrenome.errors }}</div>{% endif %}
+                        <p class="form-description">Sobrenome</p>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="{{ form.nome.id_for_label }}">Nome <span class="required">*</span></label>
+                        {{ form.nome }}
+                        {% if form.nome.errors %}<div class="field-error">{{ form.nome.errors }}</div>{% endif %}
+                        <p class="form-description">Nome próprio</p>
+                    </div>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="{{ form.cutter.id_for_label }}">Cutter</label>
+                        {{ form.cutter }}
+                        {% if form.cutter.errors %}<div class="field-error">{{ form.cutter.errors }}</div>{% endif %}
+                        <p class="form-description">Clique no <a href="https://www.tabelacutter.com" t'
+                        'arget="_blank">link da Tabela Cutter</a> para gerar o Cutter e insira o valor gerado neste campo.'</p>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="{{ form.ano.id_for_label }}">Ano de Publicação <span class="required">*</span></label>
+                        {{ form.ano }}
+                        {% if form.ano.errors %}<div class="field-error">{{ form.ano.errors }}</div>{% endif %}
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label for="{{ form.titulo.id_for_label }}">Título <span class="required">*</span></label>
+                    {{ form.titulo }}
+                    {% if form.titulo.errors %}<div class="field-error">{{ form.titulo.errors }}</div>{% endif %}
+                </div>
+
+                <div class="form-group">
+                    <label for="{{ form.sub_titulo.id_for_label }}">Subtítulo</label>
+                    {{ form.sub_titulo }}
+                    {% if form.sub_titulo.errors %}<div class="field-error">{{ form.sub_titulo.errors }}</div>{% endif %}
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="{{ form.cidade.id_for_label }}">Local / Cidade <span class="required">*</span></label>
+                        {{ form.cidade }}
+                        {% if form.cidade.errors %}<div class="field-error">{{ form.cidade.errors }}</div>{% endif %}
+                    </div>
+
+                    <div class="form-group">
+                        <label for="{{ form.instituicao.id_for_label }}">Instituição <span class="required">*</span></label>
+                        {{ form.instituicao }}
+                        {% if form.instituicao.errors %}<div class="field-error">{{ form.instituicao.errors }}</div>{% endif %}
+                    </div>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="{{ form.curso.id_for_label }}">Curso</label>
+                        {{ form.curso }}
+                        {% if form.curso.errors %}<div class="field-error">{{ form.curso.errors }}</div>{% endif %}
+                    </div>
+
+                    <div class="form-group">
+                        <label for="{{ form.campus.id_for_label }}">Campus</label>
+                        {{ form.campus }}
+                        {% if form.campus.errors %}<div class="field-error">{{ form.campus.errors }}</div>{% endif %}
+                    </div>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="{{ form.folhas.id_for_label }}">Número de Páginas (f.)</label>
+                        {{ form.folhas }}
+                        {% if form.folhas.errors %}<div class="field-error">{{ form.folhas.errors }}</div>{% endif %}
+                    </div>
+
+                    <div class="form-group">
+                        <label for="{{ form.figuras.id_for_label }}">Possui Figuras?</label>
+                        {{ form.figuras }}
+                        {% if form.figuras.errors %}<div class="field-error">{{ form.figuras.errors }}</div>{% endif %}
+                    </div>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="{{ form.referencias.id_for_label }}">Referências (f.)</label>
+                        {{ form.referencias }}
+                        {% if form.referencias.errors %}<div class="field-error">{{ form.referencias.errors }}</div>{% endif %}
+                    </div>
+
+                    <div class="form-group">
+                        <label for="{{ form.anexos.id_for_label }}">Anexos (f.)</label>
+                        {{ form.anexos }}
+                        {% if form.anexos.errors %}<div class="field-error">{{ form.anexos.errors }}</div>{% endif %}
+                    </div>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="{{ form.encardenacao.id_for_label }}">Encadernação</label>
+                        {{ form.encardenacao }}
+                        {% if form.encardenacao.errors %}<div class="field-error">{{ form.encardenacao.errors }}</div>{% endif %}
+                    </div>
+
+                    <div class="form-group">
+                        <label for="{{ form.tipo_trabalho.id_for_label }}">Tipo do Trabalho</label>
+                        {{ form.tipo_trabalho }}
+                        {% if form.tipo_trabalho.errors %}<div class="field-error">{{ form.tipo_trabalho.errors }}</div>{% endif %}
+                    </div>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="{{ form.titulo_obtido.id_for_label }}">Título Obtido</label>
+                        {{ form.titulo_obtido }}
+                        {% if form.titulo_obtido.errors %}<div class="field-error">{{ form.titulo_obtido.errors }}</div>{% endif %}
+                    </div>
+
+                    <div class="form-group">
+                        <label for="{{ form.fonte.id_for_label }}">Fonte (tipo)</label>
+                        {{ form.fonte }}
+                        {% if form.fonte.errors %}<div class="field-error">{{ form.fonte.errors }}</div>{% endif %}
+                    </div>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="{{ form.tamanho_fonte.id_for_label }}">Tamanho da Fonte</label>
+                        {{ form.tamanho_fonte }}
+                        {% if form.tamanho_fonte.errors %}<div class="field-error">{{ form.tamanho_fonte.errors }}</div>{% endif %}
+                    </div>
+
+                    <div class="form-group">
+                        <label for="{{ form.cutter.id_for_label }}">Cutter (se aplicável)</label>
+                        {{ form.cutter }}
+                    </div>
+                </div>
+
+                <hr style="margin:1.5rem 0;border:none;border-top:1px solid var(--border)">
+
+                <h4 style="margin-bottom:1rem">Orientadores</h4>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="{{ form.orientador.id_for_label }}">Orientador(a)</label>
+                        {{ form.orientador }}
+                        {% if form.orientador.errors %}<div class="field-error">{{ form.orientador.errors }}</div>{% endif %}
+                    </div>
+
+                    <div class="form-group">
+                        <label for="{{ form.genero_orientador.id_for_label }}">Gênero</label>
+                        {{ form.genero_orientador }}
+                    </div>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="{{ form.titulo_orientador.id_for_label }}">Título</label>
+                        {{ form.titulo_orientador }}
+                    </div>
+
+                    <div class="form-group">
+                        <label for="{{ form.coorientador.id_for_label }}">Coorientador(a)</label>
+                        {{ form.coorientador }}
+                    </div>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="{{ form.genero_coorientador.id_for_label }}">Gênero Coorientador</label>
+                        {{ form.genero_coorientador }}
+                    </div>
+
+                    <div class="form-group">
+                        <label for="{{ form.titulo_coorientador.id_for_label }}">Título Coorientador</label>
+                        {{ form.titulo_coorientador }}
+                    </div>
+                </div>
+
+                <hr style="margin:1.5rem 0;border:none;border-top:1px solid var(--border)">
+
+                <h4 style="margin-bottom:1rem">Assuntos / Palavras-chave</h4>
+                <div class="form-group">
+                    <label for="{{ form.assunto1.id_for_label }}">Assunto 1 <span class="required">*</span></label>
+                    {{ form.assunto1 }}
+                    {% if form.assunto1.errors %}<div class="field-error">{{ form.assunto1.errors }}</div>{% endif %}
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="{{ form.assunto2.id_for_label }}">Assunto 2</label>
+                        {{ form.assunto2 }}
+                    </div>
+                    <div class="form-group">
+                        <label for="{{ form.assunto3.id_for_label }}">Assunto 3</label>
+                        {{ form.assunto3 }}
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="{{ form.assunto4.id_for_label }}">Assunto 4</label>
+                        {{ form.assunto4 }}
+                    </div>
+                    <div class="form-group">
+                        <label for="{{ form.assunto5.id_for_label }}">Assunto 5</label>
+                        {{ form.assunto5 }}
+                    </div>
+                </div>
+
+                <div style="margin-top:1.25rem">
+                    <button type="submit" class="submit-button">
+                        <span>⬇</span>
+                        <span>Gerar Ficha Catalográfica</span>
+                    </button>
+                </div>
+            </form>
+        </div>
+
+        <div class="info-cards">
+            <div class="info-card">
+                <div class="info-card-icon">⚡</div>
+                <h4>Rápido e Fácil</h4>
+                <p>Gere sua ficha em poucos cliques</p>
+            </div>
+            <div class="info-card">
+                <div class="info-card-icon">✓</div>
+                <h4>Sempre Gratuito</h4>
+                <p>Sem custos ou limitações de uso</p>
+            </div>
+            <div class="info-card">
+                <div class="info-card-icon">☕</div>
+                <h4>Ajude o Dev</h4>
+                <p>Curtiu a ferramenta? Apoie o desenvolvimento com um café ☕ ou compartilhe com colegas acadêmicos.</p>
+            </div>
+        </div>
+    </main>
+
+    <footer>
+        <p>&copy; <script>document.write(new Date().getFullYear())</script> Gerador de Ficha Catalográfica. Desenvolvido para a comunidade acadêmica.</p>
+    </footer>
+</body>
 </html>
--
