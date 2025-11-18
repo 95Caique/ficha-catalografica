@@ -1,11 +1,13 @@
+from http.client import responses
 from io import BytesIO
 
 
-from django.shortcuts import render
-from django.http import HttpResponse, HttpResponseRedirect
+from django.shortcuts import render, get_object_or_404
+from django.http import HttpResponse, HttpResponseRedirect, Http404
 
 
 from .forms import FichaForm
+from .models import Ficha
 
 from reportlab.rl_config import defaultPageSize
 from reportlab.pdfbase import pdfmetrics
@@ -292,3 +294,174 @@ def defineTitulo(titulo, genero):
         else:
             abreviacao = 'Dra.'
     return abreviacao
+
+
+largura_pagina = defaultPageSize[0]
+altura_pagina = defaultPageSize[1]
+
+RECT_X_CM = 4.0
+RECT_Y_CM = 5.5
+RECT_W_CM = 13.5
+RECT_H_CM = 7.5
+
+CUTTER_OFFSET_CM = 0.6
+INNER_H_PADDING_CM = 0.8
+INNER_V_PADDING_CM = 1.2
+DEFAULT_FONT = "Helvetica"
+
+
+def ficha_admin(request, pk):
+    """
+    Gera o PDF com retângulo e conteúdo dentro (para uso no admin).
+    Usa Paragraph+Frame para quebra automática (sem sobrescrita).
+    """
+    ficha = get_object_or_404(Ficha, pk=pk)
+
+    buffer = BytesIO()
+    p = canvas.Canvas(buffer, pagesize=(largura_pagina, altura_pagina))
+    p.setTitle(f"Ficha {ficha.titulo or ficha.pk}")
+
+    # decide fonte
+    fontname = DEFAULT_FONT
+    fonte_model = (ficha.fonte or "").lower()
+    if fonte_model.startswith('times'):
+        fontname = "Times-Roman"
+    elif fonte_model.startswith('courier'):
+        fontname = "Courier"
+    else:
+        fontname = "Helvetica"
+
+    fontsize = ficha.tamanho_fonte or 10
+    try:
+        p.setFont(fontname, fontsize)
+    except Exception:
+        fontname = DEFAULT_FONT
+        p.setFont(fontname, fontsize)
+
+    # cabeçalho (acima do retângulo) — centralizado horizontalmente
+    header1 = "Ficha de identificação da obra elaborada pelo autor, através do"
+    header2 = "Programa de Geração Automática do Sistema de Ficha Catalográfica"
+    top_of_rect_y = (RECT_Y_CM + RECT_H_CM) * cm
+    gap_above_rect = 1.0 * cm
+    y1 = top_of_rect_y + gap_above_rect
+    p.drawString((largura_pagina - pdfmetrics.stringWidth(header1, fontname, fontsize)) / 2.0, y1, header1)
+    p.drawString((largura_pagina - pdfmetrics.stringWidth(header2, fontname, fontsize)) / 2.0, y1 - (fontsize * 1.1), header2)
+
+    # desenha o retângulo onde vai o conteúdo da ficha
+    p.setLineWidth(0.1)
+    p.rect(RECT_X_CM * cm, RECT_Y_CM * cm, RECT_W_CM * cm, RECT_H_CM * cm, stroke=1, fill=False)
+
+    cutter_text = ficha.cutter or ''
+    cutter_x = (RECT_X_CM + 0.3) * cm
+    cutter_y = (RECT_Y_CM + RECT_H_CM - CUTTER_OFFSET_CM) * cm
+    p.setFont(fontname, fontsize)
+    p.drawString(cutter_x, cutter_y, str(cutter_text))
+
+    styles = getSampleStyleSheet()
+    leading = max(fontsize * 1.25, fontsize + 2)
+    style = ParagraphStyle(
+        'ficha_normal',
+        parent=styles['Normal'],
+        fontName=fontname,
+        fontSize=fontsize,
+        leading=leading,
+        spaceAfter=4,
+    )
+
+    nome = f"{ficha.sobrenome}, {ficha.nome}"
+    if ficha.sub_titulo:
+        titulo_text = f"{ficha.titulo}: {ficha.sub_titulo} / {ficha.nome} {ficha.sobrenome}. {ficha.cidade} {ficha.ano}."
+    else:
+        titulo_text = f"{ficha.titulo} / {ficha.nome} {ficha.sobrenome}. {ficha.cidade} {ficha.ano}."
+
+    trabalho_text = f"{ficha.folhas}f."
+    if ficha.figuras == 'Sim':
+        trabalho_text += " il."
+    if ficha.encardenacao:
+        trabalho_text += f" enc.{ficha.encardenacao.lower()}. capa dura"
+
+    orientacao = ""
+    if ficha.orientador:
+        titulo_or = ficha.titulo_orientador or ""
+        genero_or = (ficha.genero_orientador or "").lower()
+        if genero_or == 'masculino':
+            orientacao = f"Orientador: Prof. {titulo_or} {ficha.orientador}."
+        else:
+            orientacao = f"Orientadora: Profª. {titulo_or} {ficha.orientador}."
+
+    coorientacao = ""
+    if ficha.coorientador:
+        titulo_co = ficha.titulo_coorientador or ""
+        genero_co = (ficha.genero_coorientador or "").lower()
+        if genero_co == 'masculino':
+            coorientacao = f"Coorientador: Prof. {titulo_co} {ficha.coorientador}."
+        else:
+            coorientacao = f"Coorientadora: Profª. {titulo_co} {ficha.coorientador}."
+
+    tipo_trabalho_info = f"{ficha.tipo_trabalho} ({ficha.titulo_obtido}) - {ficha.instituicao}, curso de {ficha.curso}."
+    referencias = f"Referências bibliográficas: f.{ficha.referencias or ''}"
+    anexos = f"Anexos: f.{ficha.anexos or ''}"
+
+    story = [
+        Paragraph(nome, style),
+        Paragraph(titulo_text, style),
+        Paragraph(trabalho_text, style),
+        Paragraph(orientacao, style),
+    ]
+    if coorientacao:
+        story.append(Paragraph(coorientacao, style))
+    story += [
+        Paragraph(tipo_trabalho_info, style),
+        Paragraph(referencias, style),
+        Paragraph(anexos, style),
+    ]
+
+    assuntos = []
+    for i in range(1, 6):
+        v = getattr(ficha, f"assunto{i}", None)
+        if v:
+            assuntos.append(v)
+    if assuntos:
+        pista = " ".join(f"{idx+1}. {a}." for idx, a in enumerate(assuntos))
+        pista += " I. Título."
+        story.append(Paragraph(pista, style))
+
+    # Frame (área interna do retângulo)
+    frame_x = (RECT_X_CM + INNER_H_PADDING_CM) * cm
+    frame_y = (RECT_Y_CM + INNER_V_PADDING_CM) * cm
+    frame_w = (RECT_W_CM - 2 * INNER_H_PADDING_CM) * cm
+    frame_h = (RECT_H_CM - 2 * INNER_V_PADDING_CM) * cm
+
+    frame = Frame(frame_x, frame_y, frame_w, frame_h, showBoundary=0)
+    frame.addFromList(story, p)
+
+    p.showPage()
+    p.save()
+    buffer.seek(0)
+    response = HttpResponse(buffer.getvalue(), content_type='application/pdf')
+    response['Content-Disposition'] = f'inline; filename="ficha_{ficha.pk}.pdf"'
+    return response
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

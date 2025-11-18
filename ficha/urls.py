@@ -7,5 +7,6 @@ from django.views.generic import RedirectView
 urlpatterns = [
     path('admin/', admin.site.urls),
     path('', RedirectView.as_view(pattern_name='arquivo:index_ficha', permanent=False)),
-    path('', include('arquivo.urls')),
+    path('', include(('arquivo.urls', 'arquivo'), namespace='arquivo')),
+
 ] + static(settings.STATIC_URL, document_root=settings.STATIC_ROOT)
