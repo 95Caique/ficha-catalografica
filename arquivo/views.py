@@ -41,9 +41,11 @@ def index_ficha(request):
     if request.method != 'POST':
         form = FichaForm()
     else:
-        form = FichaForm(request.POST)
+        form = FichaForm(request.POST, request.FILES or None)
         if form.is_valid():
             nova_ficha = form.save(commit=False)
+            nova_ficha.save() #se remover esse save, não aparece no admin, apenas vai gerar a ficha no
+                              # navegador sem salvar
             request = salvaInformacoes(request, nova_ficha)
             return HttpResponseRedirect('/ficha/')
 
@@ -441,27 +443,3 @@ def ficha_admin(request, pk):
     response = HttpResponse(buffer.getvalue(), content_type='application/pdf')
     response['Content-Disposition'] = f'inline; filename="ficha_{ficha.pk}.pdf"'
     return response
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
